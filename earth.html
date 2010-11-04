@@ -3,7 +3,7 @@
 <head>
 <style type="text/css">
   #earth {
-    width: 800px;
+    width: 900px;
     height: 698px;
 	border: 1px solid;
   }
@@ -11,6 +11,7 @@
 <script type="text/javascript" src="jquery-1.4.2.min.js"></script>
 </head>
 <body>
+<input type="text" id="center" value="0, 0" /><br />
 <canvas id="earth" width="900" height="698">
 Your browser likely does not support canvas.
 </canvas>
@@ -20,8 +21,8 @@ Your browser likely does not support canvas.
 <!--
 
 (function ($) {
-	function Mercaderify() {}
-	$.extend(Mercaderify.prototype, {
+	function Mercaterify() {}
+	$.extend(Mercaterify.prototype, {
 
 		init: function (canvasElement, imgSrc) {
 			this.canvasElement = canvasElement;
@@ -29,8 +30,28 @@ Your browser likely does not support canvas.
 			this.originalData = null;
 			this.dimensions = [canvasElement.width, canvasElement.height];
 			this.imageLoaded = false;
-			this.onImageload = [];
+			this.onImageload = [this.registerDrag];
+			this.currentPosition = [0, 0];
 			this.loadImage(imgSrc);
+		},
+
+		registerDrag: function () {
+			var that = this;
+			var c = $(this.canvasElement);
+			c.bind("mousedown", function (event) {
+				var startPos = [event.pageX, event.pageY];
+				c.mousemove(function (event) {
+					var left = event.pageX - startPos[0];
+					var top = event.pageY - startPos[1];
+					var lng = 360 * (left / that.dimensions[0]) + that.currentPosition[0];
+					var lat = 360 * (top / that.dimensions[1]) + that.currentPosition[1];
+					that.currentPosition = [lat, lng];
+					that.rotateEarth(lat, lng);
+				});
+			});
+			c.bind("mouseup", function () {
+				c.unbind("mousemove");
+			});
 		},
 
 		onImageLoad: function (callback) {
@@ -49,8 +70,8 @@ Your browser likely does not support canvas.
 				that.context.drawImage(img, 0, 0);
 				that.originalData = that.context.getImageData(0, 0, that.dimensions[0], that.dimensions[1]).data;
 				var events = that.onImageload;
-				this.onImageload = [];
-				this.imageLoaded = true;
+				that.onImageload = [];
+				that.imageLoaded = true;
 				for (var idx = 0; idx < events.length; idx++) {
 					events[idx].call(that);
 				}
@@ -64,8 +85,8 @@ Your browser likely does not support canvas.
 			var w = this.dimensions[0];
 			var h = this.dimensions[1];
 			var oldData = this.originalData;
-			window.data = oldData;
 			var newData = this.context.createImageData(this.dimensions[0], this.dimensions[1]);
+
 			for (var y = 0; y < h; y++) {
 				for (var x = 0; x < w; x++) {
 					var otherPos = this.recomputeCoordinates(lat, lng, x, y); 
@@ -78,12 +99,11 @@ Your browser likely does not support canvas.
 				}
 			}
 			this.context.putImageData(newData, 0, 0);
-			alert("put");
 		},
 
 		recomputeCoordinates: function(offsetLat, offsetLng, x, y) {
-			offsetLat *= (2 * Math.PI / 180);
-			offsetLng *= (2 * Math.PI / 180);
+			offsetLat /= 360;
+			offsetLng /= 360;
 			var phi_0 = 2 * Math.atan(Math.exp(y / this.dimensions[1])) - .5 * Math.PI - offsetLat;
 			var theta_0 = x / this.dimensions[0] - offsetLng;
 
@@ -96,20 +116,40 @@ Your browser likely does not support canvas.
 		}
 	});
 
-	$.fn.mercaderify = function (imgSrc) {
+	$.fn.mercaterify = function (imgSrc) {
 		this.each(function () {
-			var m = new Mercaderify;
+			var m = new Mercaterify;
 			m.init(this, imgSrc);
+			this._mercaterify = m;
+		});
+	};
+
+	$.fn.rotateProjection = function (latCenter, lngCenter) {
+		this.each(function () {
+			var m = this._mercaterify;
+			if (typeof(m) == "undefined") {
+				return;
+			}
 			m.onImageLoad(function () {
-				this.rotateEarth(8, 0);
+				this.rotateEarth(latCenter, lngCenter);
 			});
 		});
-	}
+	};
 })(jQuery);
+
+
+
 
 (function ($) {
   $(document).ready(function () {
-		$("#earth").mercaderify("earth.png");
+		var earth = $("#earth");
+		earth.mercaterify("earth.png");
+	/*
+		$("#center").change(function () {
+			var d = this.value.split(new RegExp("\s*,\s*"));
+			earth.rotateProjection(d[0], d[1]);
+		});
+	*/
   });
 })(jQuery);
 //-->
