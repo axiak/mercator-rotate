@@ -1,27 +1,115 @@
+<!doctype html>
 <html>
 <head>
 <style type="text/css">
   #earth {
     width: 800px;
     height: 698px;
+	border: 1px solid;
   }
 </style>
-<script type="text/javascript" src="http://code.jquery.com/jquery-1.4.3.min.js"></script>
+<script type="text/javascript" src="jquery-1.4.2.min.js"></script>
 </head>
 <body>
-<canvas id="earth" width="800" height="698">
+<canvas id="earth" width="900" height="698">
 Your browser likely does not support canvas.
 </canvas>
+<div id="logging"></div>
+
 <script type="text/javascript">
 <!--
+
+(function ($) {
+	function Mercaderify() {}
+	$.extend(Mercaderify.prototype, {
+
+		init: function (canvasElement, imgSrc) {
+			this.canvasElement = canvasElement;
+			this.context = canvasElement.getContext('2d');
+			this.originalData = null;
+			this.dimensions = [canvasElement.width, canvasElement.height];
+			this.imageLoaded = false;
+			this.onImageload = [];
+			this.loadImage(imgSrc);
+		},
+
+		onImageLoad: function (callback) {
+			if (this.imageLoaded) {
+				callback.call(this);
+			} else {
+				this.onImageload.push(callback);
+			}
+		},
+
+		loadImage: function(imgSrc) {
+			var that = this;
+			var img = new Image();
+			img.src = imgSrc;
+			img.onload = function () {
+				that.context.drawImage(img, 0, 0);
+				that.originalData = that.context.getImageData(0, 0, that.dimensions[0], that.dimensions[1]).data;
+				var events = that.onImageload;
+				this.onImageload = [];
+				this.imageLoaded = true;
+				for (var idx = 0; idx < events.length; idx++) {
+					events[idx].call(that);
+				}
+			};
+		},
+
+		rotateEarth: function(lat, lng) {
+			if (this.originalData == null) {
+				return;
+			}
+			var w = this.dimensions[0];
+			var h = this.dimensions[1];
+			var oldData = this.originalData;
+			window.data = oldData;
+			var newData = this.context.createImageData(this.dimensions[0], this.dimensions[1]);
+			for (var y = 0; y < h; y++) {
+				for (var x = 0; x < w; x++) {
+					var otherPos = this.recomputeCoordinates(lat, lng, x, y); 
+					var idx1 = 4 * (y * w + x);
+					var idx2 = 4 * (otherPos[1] * w + otherPos[0])
+					newData.data[idx1] = oldData[idx2];
+					newData.data[idx1 + 1] = oldData[idx2 + 1];
+					newData.data[idx1 + 2] = oldData[idx2 + 2];
+					newData.data[idx1 + 3] = oldData[idx2 + 3];
+				}
+			}
+			this.context.putImageData(newData, 0, 0);
+			alert("put");
+		},
+
+		recomputeCoordinates: function(offsetLat, offsetLng, x, y) {
+			offsetLat *= (2 * Math.PI / 180);
+			offsetLng *= (2 * Math.PI / 180);
+			var phi_0 = 2 * Math.atan(Math.exp(y / this.dimensions[1])) - .5 * Math.PI - offsetLat;
+			var theta_0 = x / this.dimensions[0] - offsetLng;
+
+			return this.scale(theta_0, Math.log(Math.tan(phi_0) + 1 / Math.cos(phi_0)));
+		},
+
+		scale: function (x, y) {
+			return [Math.round((2 + x) * this.dimensions[0] % this.dimensions[0]),
+              Math.round((2 + y) * this.dimensions[1] % this.dimensions[1])];
+		}
+	});
+
+	$.fn.mercaderify = function (imgSrc) {
+		this.each(function () {
+			var m = new Mercaderify;
+			m.init(this, imgSrc);
+			m.onImageLoad(function () {
+				this.rotateEarth(8, 0);
+			});
+		});
+	}
+})(jQuery);
+
 (function ($) {
   $(document).ready(function () {
-    var img = new Image();
-    img.src = 'earth.png';
-    var context = $("#earth").get(0).getContext('2d');
-    context.drawImage(img, 0, 0);
-    var data = context.getImageData(x, y, 1, 1).data;
-    //alert(data);
+		$("#earth").mercaderify("earth.png");
   });
 })(jQuery);
 //-->
