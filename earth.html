@@ -1,0 +1,30 @@
+<html>
+<head>
+<style type="text/css">
+  #earth {
+    width: 800px;
+    height: 698px;
+  }
+</style>
+<script type="text/javascript" src="http://code.jquery.com/jquery-1.4.3.min.js"></script>
+</head>
+<body>
+<canvas id="earth" width="800" height="698">
+Your browser likely does not support canvas.
+</canvas>
+<script type="text/javascript">
+<!--
+(function ($) {
+  $(document).ready(function () {
+    var img = new Image();
+    img.src = 'earth.png';
+    var context = $("#earth").get(0).getContext('2d');
+    context.drawImage(img, 0, 0);
+    var data = context.getImageData(x, y, 1, 1).data;
+    //alert(data);
+  });
+})(jQuery);
+//-->
+</script>
+</body>
+</html>
